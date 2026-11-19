@@ -17,13 +17,28 @@ def open_issues(repo: str, days: int = 60, limit: int = 50) -> list[dict]:
     since = (date.today() - timedelta(days=days)).isoformat()
     jq = ('.[] | select(.pull_request|not) | select(.created_at >= "' + since + '") | '
           '{repo: "' + repo + '", number: .number, title: .title, url: .html_url, '
-          'comments: .comments, created: .created_at[:10], labels: [.labels[].name]}')
+          'comments: .comments, created: .created_at[:10], labels: [.labels[].name], author: .user.login}')
     out = subprocess.run(
         ["gh", "api", f"repos/{repo}/issues?state=open&assignee=none&sort=created&direction=desc&per_page={limit}",
          "--jq", jq], capture_output=True, text=True, timeout=30)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip().splitlines()[-1] if out.stderr.strip() else "gh api failed")
     return [json.loads(line) for line in out.stdout.splitlines()]
+
+
+def open_pr_claims(repo: str) -> tuple[set, set]:
+    """Issue numbers mentioned by open PRs (e.g. "Fixes #7"), and authors of open PRs.
+
+    The core issues API can't see linked PRs, so this catches issues someone is already fixing.
+    """
+    pulls = _gh_json(f"repos/{repo}/pulls?state=open&per_page=100") or []
+    nums, authors = set(), set()
+    for p in pulls:
+        text = f'{p.get("title") or ""} {p.get("body") or ""}'
+        nums |= {int(n) for n in re.findall(r"#(\d+)\b", text)}
+        nums |= {int(n) for n in re.findall(rf"{re.escape(repo)}/issues/(\d+)", text)}
+        authors.add((p.get("user") or {}).get("login", ""))
+    return nums, authors
 
 
 CLOSED_PHRASES = re.compile(

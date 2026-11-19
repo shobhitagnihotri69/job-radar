@@ -126,7 +126,10 @@ def issues(args, cfg: dict) -> None:
         except Exception as e:
             sources.log(f"  {repo}: ERROR {e}")
             continue
+        claimed_nums, pr_authors = github.open_pr_claims(repo)
         for i in got:
+            if i["number"] in claimed_nums or i.get("author") in pr_authors:
+                continue  # an open PR already fixes it, or the reporter has a PR open
             if not SKIP_LABELS & {l.lower() for l in i["labels"]}:
                 i["outside_merged"] = policy["outside_merged"]
                 found.append(i)
