@@ -8,6 +8,8 @@ and measure your outreach funnel until it turns into a paid role.
   (organization-owned only; star-farmed clone clusters are filtered out).
 - **Scoring:** keyword weights in `config.json`. Edit them to match your domain.
 - **Action cards:** founders (LinkedIn / X / bio) and the company's most active GitHub repos.
+- **Jobs:** open roles from Ashby, Greenhouse, Lever and YC job pages for radar companies plus a watch list,
+  matched by role type and tagged india / remote-global / other-region / us-only (only the first two shown by default).
 - **Pipeline:** a CSV of companies moving through stages, with reply and call rates.
 
 Python 3.9+, standard library only. Action cards need the [GitHub CLI](https://cli.github.com) logged in (`gh auth login`).
@@ -22,6 +24,7 @@ python3 -m radar scan --enrich 25 --open # also open out/radar.html (clickable, 
 
 python3 -m radar track "Superserve" contacted --channel x --role "support engineer"
 python3 -m radar funnel                  # counts per stage, reply rate, call rate
+python3 -m radar jobs --open             # support / solutions / FDE / intern roles you can apply to (India or global remote)
 python3 -m radar issues --open           # unclaimed issues; skips repos that refuse outside PRs, ranks by newcomer merges
 ```
 

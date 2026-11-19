@@ -59,6 +59,30 @@ class HNTitleTest(unittest.TestCase):
                          ("Tiny VM", None, "microVMs that boot in 50ms"))
 
 
+class JobsTest(unittest.TestCase):
+    def test_slugs(self):
+        from radar.jobs import slugs
+        self.assertEqual(slugs("Agent 37", "https://agent37.com/"), ["agent37", "agent-37"])
+        self.assertEqual(slugs("Browser Use"), ["browseruse", "browser-use"])
+
+    def test_eligibility(self):
+        from radar.jobs import eligibility
+        job = lambda loc, remote=False, visa="": {"location": loc, "remote": remote, "visa": visa}
+        self.assertEqual(eligibility(job("Bengaluru, India")), "india")
+        self.assertEqual(eligibility(job("IN / Remote (IN)", True, "US citizen/visa only")), "india")
+        self.assertEqual(eligibility(job("San Francisco, CA, US", visa="US citizen/visa only")), "us-only")
+        self.assertEqual(eligibility(job("Remote (US)", True)), "us-only")
+        self.assertEqual(eligibility(job("Remote - Worldwide", True)), "remote-global")
+        self.assertEqual(eligibility(job("Remote", True)), "remote-global")
+        self.assertEqual(eligibility(job("London")), "other-region")
+        self.assertEqual(eligibility(job("India")), "india")
+        self.assertEqual(eligibility(job("Remote, APAC")), "remote-global")
+        self.assertEqual(eligibility(job("Remote, AMER")), "other-region")
+        self.assertEqual(eligibility(job("Sofia, Bulgaria", True)), "other-region")
+        self.assertEqual(eligibility(job("NYC (SoHo)", True)), "us-only")
+        self.assertEqual(eligibility(job("Mars Base 1")), "check")
+
+
 class PolicyPhraseTest(unittest.TestCase):
     def test_detects_closed_policies(self):
         from radar.github import CLOSED_PHRASES

@@ -13,6 +13,10 @@
     "queries": ["sandbox agent", "microvm", "agent runtime", "llm inference", "rl environment", "coding agent", "robot learning dataset"]
   },
   "min_score": 4,
+  "jobs": {
+    "roles": "support engineer|technical support|product support|solutions? engineer|customer engineer|implementation engineer|integration engineer|forward[- ]deployed|deployment engineer|developer (advocate|relations|success)|devrel|community engineer|success engineer|intern\\b|internship|new grad|junior|associate engineer|ai engineer|software engineer i\\b",
+    "watch": ["PostHog", "Supabase", "Qdrant", "Emergent", "Handshake", "Mercor", "micro1", "Modal", "E2B", "Daytona", "Browser Use", "LangChain", "Pydantic", "Tensorlake", "Unikraft", "Railway", "Vercel", "Replit", "Sentry", "Hugging Face"]
+  },
   "output_dir": "out",
   "pipeline_file": "pipeline.csv",
   "keywords": {

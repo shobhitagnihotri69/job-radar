@@ -169,6 +169,75 @@ that you are taking it. Aim for 50-100 lines. "Newcomer merges" = merged PRs (la
         webbrowser.open(f"file://{page}")
 
 
+def jobs_cmd(args, cfg: dict) -> None:
+    import csv
+    import re
+    from html import escape as e
+
+    from . import jobs as J
+
+    out_dir = os.path.join(ROOT, cfg.get("output_dir", "out"))
+    jcfg = cfg.get("jobs", {})
+    companies = []
+    path = os.path.join(out_dir, "companies.csv")
+    if os.path.exists(path) and not args.watch_only:
+        min_score = cfg["min_score"]
+        for r in csv.DictReader(open(path)):
+            if r["source"] in ("YC", "a16z speedrun", "Launch HN") and (
+                    int(r["score"]) >= min_score or r["hiring"] == "yes"):
+                companies.append(r)
+        companies = companies[:args.limit]
+    companies += [{"name": n, "source": "watch", "website": "", "hiring": "", "profile": ""}
+                  for n in jcfg.get("watch", []) + (args.company or [])]
+    sources.log(f"Checking job boards for {len(companies)} companies...")
+
+    role_re = re.compile(".*" if args.all_roles else jcfg["roles"], re.I)
+    rows, boards = J.collect(companies, role_re)
+    if not args.show_us:
+        hidden = sum(r["eligible"] in ("us-only", "other-region") for r in rows)
+        rows = [r for r in rows if r["eligible"] not in ("us-only", "other-region")]
+        sources.log(f"  hid {hidden} US-only / other-region roles (use --show-us to include them)")
+    order = {"india": 0, "remote-global": 1, "check": 2, "other-region": 3, "us-only": 4}
+    rows.sort(key=lambda r: (order[r["eligible"]], r["company"].lower(), r["title"]))
+
+    with open(os.path.join(out_dir, "jobs.csv"), "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["eligible", "company", "title", "location", "remote", "pay", "visa",
+                                          "board", "url"], extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+
+    trs = "".join(
+        f'<tr><td><b>{e(r["eligible"])}</b></td><td>{e(r["company"])}</td>'
+        f'<td><a href="{e(r["url"])}" target="_blank" rel="noopener">{e(r["title"])}</a></td>'
+        f'<td>{e(r["location"] or "-")}</td><td>{e(r["pay"])}</td><td>{e(r["board"])}</td></tr>' for r in rows)
+    page = os.path.join(out_dir, "jobs.html")
+    with open(page, "w") as f:
+        f.write(f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open roles</title><style>
+:root{{--bg:#fff;--fg:#1a1a1a;--line:#e5e5e5;--link:#0b57d0;--sub:#666}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#151515;--fg:#e8e8e8;--line:#2c2c2c;--link:#8ab4f8;--sub:#9a9a9a}}}}
+body{{background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,system-ui,sans-serif;margin:16px}}
+input{{width:100%;max-width:420px;padding:8px;margin:8px 0 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px}}
+.wrap{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}}
+th,td{{text-align:left;padding:7px;border-bottom:1px solid var(--line);vertical-align:top}}
+a{{color:var(--link);text-decoration:none}} p{{color:var(--sub)}}</style></head><body>
+<h2>Open roles ({len(rows)})</h2>
+<p>india = based in India &middot; remote-global = remote without a US-only restriction &middot; check = read the posting.
+US-only and other-region (Europe, Americas, Australia...) roles are hidden; --show-us shows them. Boards found for {len(boards)} companies.</p>
+<input id="q" placeholder="Filter: support, intern, remote, india..." autofocus>
+<div class="wrap"><table><thead><tr><th>Where</th><th>Company</th><th>Role</th><th>Location</th><th>Pay</th><th>Board</th></tr></thead>
+<tbody id="t">{trs}</tbody></table></div>
+<script>document.getElementById('q').addEventListener('input',function(){{var q=this.value.toLowerCase();
+document.querySelectorAll('#t tr').forEach(function(r){{r.style.display=r.textContent.toLowerCase().indexOf(q)>-1?'':'none'}})}});</script>
+</body></html>""")
+    for r in rows[:args.show]:
+        print(f'[{r["eligible"]:<13}] {r["company"]:<18} {r["title"][:60]:<60} {r["location"][:30]}\n    {r["url"]}')
+    sources.log(f"\n{len(rows)} roles -> {page}")
+    if args.open:
+        import webbrowser
+        webbrowser.open(f"file://{page}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="radar", description="Track newly funded startups and your outreach funnel.")
     ap.add_argument("--config", default=os.path.join(ROOT, "config.json"))
@@ -194,6 +263,15 @@ def main() -> None:
 
     sub.add_parser("funnel", help="show pipeline counts and reply rates")
 
+    j = sub.add_parser("jobs", help="open support/solutions/FDE/intern roles from Ashby, Greenhouse, Lever and YC")
+    j.add_argument("--limit", type=int, default=120, help="max radar companies to check (plus the watch list)")
+    j.add_argument("--company", nargs="*", help="extra company names to check")
+    j.add_argument("--watch-only", action="store_true", help="only check the watch list in config.json")
+    j.add_argument("--all-roles", action="store_true", help="every role, not just the configured role types")
+    j.add_argument("--show-us", action="store_true", help="include US-only roles")
+    j.add_argument("--show", type=int, default=25)
+    j.add_argument("--open", action="store_true", help="open out/jobs.html in the browser")
+
     i = sub.add_parser("issues", help="unclaimed issues in the startups' public repos")
     i.add_argument("--repo", nargs="*", help="owner/name; default: repos found by the last scan --enrich")
     i.add_argument("--days", type=int, default=60)
@@ -211,6 +289,8 @@ def main() -> None:
     elif args.cmd == "track":
         row = pipeline.track(pipe_path, args.company, args.stage, args.role, args.channel, args.note)
         print(f'{row["company"]}: {row["stage"]} ({row["updated"]})')
+    elif args.cmd == "jobs":
+        jobs_cmd(args, cfg)
     elif args.cmd == "issues":
         issues(args, cfg)
     elif args.cmd == "funnel":
