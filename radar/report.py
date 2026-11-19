@@ -43,6 +43,55 @@ def report(rows: list[dict], sources: str, min_score: int, first_run: bool, show
     return "\n".join(parts)
 
 
+def html_page(rows: list[dict], cards: list[tuple[dict, dict]], min_score: int) -> str:
+    """Self-contained page with clickable links and a search box (no external assets)."""
+    from html import escape as e
+
+    def a(url: str, text: str) -> str:
+        return f'<a href="{e(url)}" target="_blank" rel="noopener">{e(text)}</a>' if url else e(text)
+
+    by_name = {r["name"]: p for r, p in cards}
+    trs = []
+    for r in rows:
+        if r["score"] < min_score and not r["new"]:
+            continue
+        p = by_name.get(r["name"])
+        founders = ""
+        if p:
+            founders = "<br>".join(
+                f'{e(f["name"])} '
+                + " ".join(a(u, k) for k, u in (("in", f["linkedin"]), ("x", f["x"])) if u)
+                for f in p["founders"])
+            if p["github"]:
+                founders += "<br>" + a(p["github"], "GitHub")
+        links = " &middot; ".join(x for x in (a(r["profile"], "profile"), a(r["website"], "site")) if "<a" in x)
+        trs.append(
+            f'<tr><td>{"<b>NEW</b>" if r["new"] else ""}</td><td>{r["score"]}</td>'
+            f'<td><b>{a(r["profile"] or r["website"], r["name"])}</b><div class="sub">{e(r["one_liner"])}</div></td>'
+            f'<td>{e(r["source"])}<div class="sub">{e(str(r["batch"]))}</div></td>'
+            f'<td>{e(str(r["location"]) or "-")}</td><td>{e(r["hiring"])}</td><td>{founders}</td><td>{links}</td></tr>')
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Startup radar {date.today()}</title><style>
+:root{{--bg:#fff;--fg:#1a1a1a;--sub:#666;--line:#e5e5e5;--link:#0b57d0;--head:#f6f6f6}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#151515;--fg:#e8e8e8;--sub:#9a9a9a;--line:#2c2c2c;--link:#8ab4f8;--head:#1e1e1e}}}}
+body{{background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,system-ui,sans-serif;margin:16px}}
+h1{{font-size:20px;margin:0 0 4px}} .meta{{color:var(--sub);margin-bottom:12px}}
+input{{width:100%;max-width:420px;padding:8px;font-size:14px;margin-bottom:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px}}
+.wrap{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}}
+th,td{{text-align:left;vertical-align:top;padding:8px;border-bottom:1px solid var(--line)}}
+th{{background:var(--head);position:sticky;top:0}} .sub{{color:var(--sub);font-size:12px;margin-top:2px}}
+a{{color:var(--link);text-decoration:none}} a:hover{{text-decoration:underline}}
+</style></head><body>
+<h1>Startup radar - {date.today()}</h1>
+<div class="meta">{len(trs)} companies (domain score &ge; {min_score}, plus anything new). Click a name to open it.</div>
+<input id="q" placeholder="Filter: name, keyword, source, location..." autofocus>
+<div class="wrap"><table><thead><tr><th></th><th>Score</th><th>Company</th><th>Source</th><th>Location</th><th>Hiring</th><th>Founders</th><th>Links</th></tr></thead>
+<tbody id="t">{"".join(trs)}</tbody></table></div>
+<script>document.getElementById('q').addEventListener('input',function(){{var q=this.value.toLowerCase();
+document.querySelectorAll('#t tr').forEach(function(r){{r.style.display=r.textContent.toLowerCase().indexOf(q)>-1?'':'none'}})}});</script>
+</body></html>"""
+
+
 def action_cards(cards: list[tuple[dict, dict]]) -> str:
     out = [f"# Action cards - {date.today()}", "",
            "See PLAYBOOK.md. Public repo -> one verified PR, then talk to the founder.",

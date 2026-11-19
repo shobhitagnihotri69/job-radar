@@ -63,9 +63,9 @@ def scan(args, cfg: dict) -> None:
     with open(os.path.join(out_dir, "REPORT.md"), "w") as f:
         f.write(report.report(rows, label, min_score, first_run, args.all))
 
+    cards = []
     if args.enrich:
         sources.log("Enriching:")
-        cards = []
         for r in [r for r in rows if r["score"] >= min_score and r["source"] == "YC"][:args.enrich]:
             try:
                 p = sources.yc_profile(r["profile"])
@@ -77,6 +77,13 @@ def scan(args, cfg: dict) -> None:
             sources.log(f"  {r['name']}: {len(p['founders'])} founders, {len(p['repos'])} repos")
         with open(os.path.join(out_dir, "ACTION_CARDS.md"), "w") as f:
             f.write(report.action_cards(cards))
+
+    page = os.path.join(out_dir, "radar.html")
+    with open(page, "w") as f:
+        f.write(report.html_page(rows, cards, min_score))
+    if args.open:
+        import webbrowser
+        webbrowser.open(f"file://{page}")
 
     with open(snap_path, "w") as f:
         json.dump(sorted(seen | {key(r) for r in rows}), f)
@@ -96,6 +103,7 @@ def main() -> None:
     s = sub.add_parser("scan", help="fetch companies, score them, write reports")
     s.add_argument("--yc", nargs="*", help="override yc batch slugs, e.g. winter-2027")
     s.add_argument("--no-speedrun", action="store_true")
+    s.add_argument("--open", action="store_true", help="open out/radar.html in the browser when done")
     s.add_argument("--no-hn", action="store_true", help="skip Launch HN / Show HN")
     s.add_argument("--no-github", action="store_true", help="skip new GitHub repos")
     s.add_argument("--min-score", type=int)

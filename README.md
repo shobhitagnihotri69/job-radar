@@ -18,6 +18,7 @@ python3 -m radar scan                    # fetch, score, write out/REPORT.md and
 python3 -m radar scan --enrich 25        # also write out/ACTION_CARDS.md for the top 25 YC matches
 python3 -m radar scan --yc winter-2027   # just one batch
 python3 -m radar scan --all              # include non-matching companies in the report
+python3 -m radar scan --enrich 25 --open # also open out/radar.html (clickable, searchable) in the browser
 
 python3 -m radar track "Superserve" contacted --channel x --role "support engineer"
 python3 -m radar funnel                  # counts per stage, reply rate, call rate
