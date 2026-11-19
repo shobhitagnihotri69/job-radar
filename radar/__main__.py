@@ -78,9 +78,13 @@ def scan(args, cfg: dict) -> None:
         with open(os.path.join(out_dir, "ACTION_CARDS.md"), "w") as f:
             f.write(report.action_cards(cards))
 
-    if cards:  # remember which startup repos exist, for `radar issues`
+    # remember which startup repos exist, for `radar issues`: enriched YC orgs + new GitHub startup repos
+    repo_list = [{"company": r["name"], "repo": g["name"]} for r, p in cards for g in p["repos"]]
+    repo_list += [{"company": r["name"].split("/")[0], "repo": r["name"]}
+                  for r in rows if r["source"] == "GitHub new" and r["score"] >= min_score]
+    if repo_list:
         with open(os.path.join(out_dir, "repos.json"), "w") as f:
-            json.dump([{"company": r["name"], "repo": g["name"]} for r, p in cards for g in p["repos"]], f)
+            json.dump(repo_list, f)
 
     page = os.path.join(out_dir, "radar.html")
     with open(page, "w") as f:
