@@ -1,0 +1,32 @@
+{
+  "yc_batches": ["winter-2027", "spring-2027", "summer-2027", "fall-2026"],
+  "speedrun": true,
+  "min_score": 4,
+  "output_dir": "out",
+  "pipeline_file": "pipeline.csv",
+  "keywords": {
+    "sandbox": 5,
+    "micro-?vms?": 5,
+    "firecracker": 5,
+    "unikernel": 5,
+    "\\bvms?\\b|virtual machine": 3,
+    "isolat": 3,
+    "runtime": 3,
+    "inference": 4,
+    "\\bgpus?\\b": 3,
+    "kv.?cache": 5,
+    "serving": 3,
+    "\\bcuda\\b": 4,
+    "coding agent|code agent|agentic coding": 4,
+    "\\bevals?\\b|benchmark": 3,
+    "reinforcement learning|\\brl\\b|rl environment": 4,
+    "robot|lerobot|teleop": 3,
+    "dataset|data pipeline": 2,
+    "dev(eloper)? ?tools?|devtool": 2,
+    "infrastructure|\\binfra\\b": 2,
+    "compute": 2,
+    "\\bllms?\\b|model": 1,
+    "agents?\\b": 1,
+    "cloud": 1
+  }
+}
