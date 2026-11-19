@@ -59,5 +59,18 @@ class HNTitleTest(unittest.TestCase):
                          ("Tiny VM", None, "microVMs that boot in 50ms"))
 
 
+class PolicyPhraseTest(unittest.TestCase):
+    def test_detects_closed_policies(self):
+        from radar.github import CLOSED_PHRASES
+        for text in ["Herdr does not accept unsolicited pull requests",
+                     "We are not accepting external contributions right now",
+                     "This project won't accept PRs"]:
+            self.assertTrue(CLOSED_PHRASES.search(text), text)
+
+    def test_open_policy_not_flagged(self):
+        from radar.github import CLOSED_PHRASES
+        self.assertIsNone(CLOSED_PHRASES.search("We happily accept pull requests! Open an issue first."))
+
+
 if __name__ == "__main__":
     unittest.main()

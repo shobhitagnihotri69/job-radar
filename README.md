@@ -22,7 +22,7 @@ python3 -m radar scan --enrich 25 --open # also open out/radar.html (clickable, 
 
 python3 -m radar track "Superserve" contacted --channel x --role "support engineer"
 python3 -m radar funnel                  # counts per stage, reply rate, call rate
-python3 -m radar issues --open           # unclaimed issues in the startups' public repos (out/issues.html)
+python3 -m radar issues --open           # unclaimed issues; skips repos that refuse outside PRs, ranks by newcomer merges
 ```
 
 Stages: `found, pr_open, pr_merged, contacted, replied, call, trial, offer, rejected, dropped`.

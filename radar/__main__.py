@@ -110,22 +110,34 @@ def issues(args, cfg: dict) -> None:
         if not os.path.exists(path):
             sys.exit("No repos yet. Run: python3 -m radar scan --enrich 25   (or pass --repo owner/name)")
         repos = [x["repo"] for x in json.load(open(path))]
-    found = []
+    found, skipped = [], []
     for repo in repos:
+        policy = github.pr_policy(repo)
+        if policy["closed"] and not args.include_closed:
+            skipped.append(f'{repo} (CONTRIBUTING: "{policy["closed"]}")')
+            sources.log(f"  {repo}: SKIPPED, does not accept outside PRs")
+            continue
         try:
             got = github.open_issues(repo, days=args.days)
         except Exception as e:
             sources.log(f"  {repo}: ERROR {e}")
             continue
-        found += [i for i in got if not SKIP_LABELS & {l.lower() for l in i["labels"]}]
-        sources.log(f"  {repo}: {sum(i['repo'] == repo for i in found)} unclaimed")
-    # bugs first, then fewest comments (less contested), then newest
-    found.sort(key=lambda i: (not any("bug" in l.lower() for l in i["labels"]), i["comments"], i["created"]))
+        for i in got:
+            if not SKIP_LABELS & {l.lower() for l in i["labels"]}:
+                i["outside_merged"] = policy["outside_merged"]
+                found.append(i)
+        sources.log(f"  {repo}: {sum(i['repo'] == repo for i in found)} unclaimed | "
+                    f"newcomer PRs merged (30d): {policy['outside_merged']} of {policy['merged']}")
+    # repos that actually merge outside PRs first, then bugs, then fewest comments, then newest
+    found.sort(key=lambda i: (i["outside_merged"] == 0, not any("bug" in l.lower() for l in i["labels"]),
+                              i["comments"], i["created"]))
 
     from html import escape as e
     rows = "".join(
         f'<tr><td>{e(i["repo"])}</td><td><a href="{e(i["url"])}" target="_blank" rel="noopener">#{i["number"]} {e(i["title"])}</a></td>'
-        f'<td>{e(", ".join(i["labels"]))}</td><td>{i["comments"]}</td><td>{i["created"]}</td></tr>' for i in found)
+        f'<td>{e(", ".join(i["labels"]))}</td><td>{i["comments"]}</td><td>{i["created"]}</td>'
+        f'<td>{i["outside_merged"] or "<b>0</b>"}</td></tr>' for i in found)
+    skipped_html = ("<p><b>Skipped (no outside PRs accepted):</b> " + e("; ".join(skipped)) + "</p>") if skipped else ""
     page = os.path.join(out_dir, "issues.html")
     with open(page, "w") as f:
         f.write(f"""<!doctype html><html><head><meta charset="utf-8"><title>Unclaimed issues</title><style>
@@ -136,10 +148,14 @@ table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;padding:7px;
 a{{color:var(--link);text-decoration:none}}</style></head><body>
 <h2>Unclaimed issues ({len(found)})</h2>
 <p>Open, no assignee, last {args.days} days. Before coding: reproduce it locally, then comment
-that you are taking it. Aim for 50-100 lines.</p>
-<table><tr><th>Repo</th><th>Issue</th><th>Labels</th><th>Comments</th><th>Opened</th></tr>{rows}</table></body></html>""")
+that you are taking it. Aim for 50-100 lines. "Newcomer merges" = merged PRs (last 30 days) from authors with at most 2 merges, i.e. not the core team;
+0 means newcomers rarely get merged there.</p>{skipped_html}
+<table><tr><th>Repo</th><th>Issue</th><th>Labels</th><th>Comments</th><th>Opened</th><th>Newcomer merges</th></tr>{rows}</table></body></html>""")
     for i in found[:args.show]:
-        print(f'{i["repo"]:<34} {i["url"]}\n    {i["title"][:90]}  [{", ".join(i["labels"])}]')
+        print(f'{i["repo"]:<34} {i["url"]}  (newcomer merges 30d: {i["outside_merged"]})\n'
+              f'    {i["title"][:90]}  [{", ".join(i["labels"])}]')
+    for s in skipped:
+        sources.log(f"  skipped: {s}")
     sources.log(f"\n{len(found)} unclaimed issues -> {page}")
     if args.open:
         import webbrowser
@@ -176,6 +192,8 @@ def main() -> None:
     i.add_argument("--days", type=int, default=60)
     i.add_argument("--show", type=int, default=20, help="how many to print in the terminal")
     i.add_argument("--open", action="store_true", help="open out/issues.html in the browser")
+    i.add_argument("--include-closed", action="store_true",
+                   help="also list repos whose CONTRIBUTING says they do not accept outside PRs")
 
     args = ap.parse_args()
     cfg = load_config(args.config)
