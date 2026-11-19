@@ -26,6 +26,23 @@ def scan(args, cfg: dict) -> None:
     rows = [r for b in batches for r in sources.yc(b)]
     if cfg.get("speedrun", True) and not args.no_speedrun:
         rows += sources.speedrun()
+    hn_cfg = cfg.get("hn", {})
+    if hn_cfg and not args.no_hn:
+        rows += sources.hn("launch_hn", hn_cfg["days"], hn_cfg["launch_min_points"])
+        for q in hn_cfg.get("show_queries", []):
+            rows += sources.hn("show_hn", hn_cfg["days"], hn_cfg["show_min_points"], q)
+    gh_cfg = cfg.get("github_new", {})
+    if gh_cfg and not args.no_github:
+        rows += sources.github_new(gh_cfg["queries"], gh_cfg["days"], gh_cfg["min_stars"])
+
+    # the same company can arrive from several sources (e.g. YC + Launch HN); keep the first
+    uniq, names = [], set()
+    for r in rows:
+        n = r["name"].strip().lower()
+        if n not in names:
+            names.add(n)
+            uniq.append(r)
+    rows = uniq
 
     snap_path = os.path.join(out_dir, "snapshot.json")
     seen = set(json.load(open(snap_path))) if os.path.exists(snap_path) else set()
@@ -40,7 +57,8 @@ def scan(args, cfg: dict) -> None:
     rows.sort(key=lambda r: (-r["score"], r["name"].lower()))
 
     min_score = args.min_score if args.min_score is not None else cfg["min_score"]
-    label = f"YC ({', '.join(batches)})" + ("" if args.no_speedrun else ", a16z speedrun (latest cohort)")
+    label = (f"YC ({', '.join(batches)})" + ("" if args.no_speedrun else ", a16z speedrun")
+             + ("" if args.no_hn else ", Launch HN / Show HN") + ("" if args.no_github else ", new GitHub repos"))
     report.write_csv(os.path.join(out_dir, "companies.csv"), rows)
     with open(os.path.join(out_dir, "REPORT.md"), "w") as f:
         f.write(report.report(rows, label, min_score, first_run, args.all))
@@ -78,6 +96,8 @@ def main() -> None:
     s = sub.add_parser("scan", help="fetch companies, score them, write reports")
     s.add_argument("--yc", nargs="*", help="override yc batch slugs, e.g. winter-2027")
     s.add_argument("--no-speedrun", action="store_true")
+    s.add_argument("--no-hn", action="store_true", help="skip Launch HN / Show HN")
+    s.add_argument("--no-github", action="store_true", help="skip new GitHub repos")
     s.add_argument("--min-score", type=int)
     s.add_argument("--all", action="store_true", help="include non-matching companies in REPORT.md")
     s.add_argument("--enrich", type=int, default=0, metavar="N",

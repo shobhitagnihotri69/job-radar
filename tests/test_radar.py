@@ -4,6 +4,7 @@ import unittest
 
 from radar import pipeline
 from radar.score import score
+from radar.sources import HN_TITLE
 
 KW = {"sandbox": 5, "inference": 4, "agents?\\b": 1}
 
@@ -44,6 +45,18 @@ class PipelineTest(unittest.TestCase):
         out = pipeline.funnel(self.path)
         self.assertIn("reply rate: 2/4 = 50%", out)
         self.assertIn("call rate:  1/4 = 25%", out)
+
+
+class HNTitleTest(unittest.TestCase):
+    def test_launch_hn_with_batch(self):
+        m = HN_TITLE.match("Launch HN: Maritime (YC F26) \u2013 A managed cloud for production AI agents")
+        self.assertEqual((m.group("name"), m.group("batch")), ("Maritime", "YC F26"))
+        self.assertEqual(m.group("tag"), "A managed cloud for production AI agents")
+
+    def test_show_hn_without_batch(self):
+        m = HN_TITLE.match("Show HN: Tiny VM - microVMs that boot in 50ms")
+        self.assertEqual((m.group("name"), m.group("batch"), m.group("tag")),
+                         ("Tiny VM", None, "microVMs that boot in 50ms"))
 
 
 if __name__ == "__main__":

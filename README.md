@@ -3,8 +3,9 @@
 Find newly funded startups, see who founded them and whether they have public code,
 and measure your outreach funnel until it turns into a paid role.
 
-- **Sources:** YC batches (via the community [yc-oss](https://github.com/yc-oss/api) mirror, refreshed daily)
-  and the latest a16z speedrun cohort.
+- **Sources:** YC batches (via the community [yc-oss](https://github.com/yc-oss/api) mirror, refreshed daily),
+  the latest a16z speedrun cohort, Launch HN and Show HN posts (last 30 days), and new GitHub repos with traction
+  (organization-owned only; star-farmed clone clusters are filtered out).
 - **Scoring:** keyword weights in `config.json`. Edit them to match your domain.
 - **Action cards:** founders (LinkedIn / X / bio) and the company's most active GitHub repos.
 - **Pipeline:** a CSV of companies moving through stages, with reply and call rates.

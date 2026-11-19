@@ -1,6 +1,17 @@
 {
   "yc_batches": ["winter-2027", "spring-2027", "summer-2027", "fall-2026"],
   "speedrun": true,
+  "hn": {
+    "days": 30,
+    "launch_min_points": 0,
+    "show_min_points": 20,
+    "show_queries": ["sandbox", "agent", "inference", "microvm", "eval", "robot", "GPU", "RL"]
+  },
+  "github_new": {
+    "days": 30,
+    "min_stars": 100,
+    "queries": ["sandbox agent", "microvm", "agent runtime", "llm inference", "rl environment", "coding agent", "robot learning dataset"]
+  },
   "min_score": 4,
   "output_dir": "out",
   "pipeline_file": "pipeline.csv",
