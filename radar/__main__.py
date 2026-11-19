@@ -78,6 +78,10 @@ def scan(args, cfg: dict) -> None:
         with open(os.path.join(out_dir, "ACTION_CARDS.md"), "w") as f:
             f.write(report.action_cards(cards))
 
+    if cards:  # remember which startup repos exist, for `radar issues`
+        with open(os.path.join(out_dir, "repos.json"), "w") as f:
+            json.dump([{"company": r["name"], "repo": g["name"]} for r, p in cards for g in p["repos"]], f)
+
     page = os.path.join(out_dir, "radar.html")
     with open(page, "w") as f:
         f.write(report.html_page(rows, cards, min_score))
@@ -93,6 +97,53 @@ def scan(args, cfg: dict) -> None:
     sources.log(f"\n{len(rows)} companies | {n_match} matches | "
                 f"{sum(r['hiring'] == 'yes' for r in rows)} hiring | {n_new}")
     sources.log(f"-> {out_dir}/")
+
+
+SKIP_LABELS = {"question", "discussion", "wontfix", "duplicate", "invalid", "rfc", "epic", "roadmap"}
+
+
+def issues(args, cfg: dict) -> None:
+    out_dir = os.path.join(ROOT, cfg.get("output_dir", "out"))
+    repos = args.repo
+    if not repos:
+        path = os.path.join(out_dir, "repos.json")
+        if not os.path.exists(path):
+            sys.exit("No repos yet. Run: python3 -m radar scan --enrich 25   (or pass --repo owner/name)")
+        repos = [x["repo"] for x in json.load(open(path))]
+    found = []
+    for repo in repos:
+        try:
+            got = github.open_issues(repo, days=args.days)
+        except Exception as e:
+            sources.log(f"  {repo}: ERROR {e}")
+            continue
+        found += [i for i in got if not SKIP_LABELS & {l.lower() for l in i["labels"]}]
+        sources.log(f"  {repo}: {sum(i['repo'] == repo for i in found)} unclaimed")
+    # bugs first, then fewest comments (less contested), then newest
+    found.sort(key=lambda i: (not any("bug" in l.lower() for l in i["labels"]), i["comments"], i["created"]))
+
+    from html import escape as e
+    rows = "".join(
+        f'<tr><td>{e(i["repo"])}</td><td><a href="{e(i["url"])}" target="_blank" rel="noopener">#{i["number"]} {e(i["title"])}</a></td>'
+        f'<td>{e(", ".join(i["labels"]))}</td><td>{i["comments"]}</td><td>{i["created"]}</td></tr>' for i in found)
+    page = os.path.join(out_dir, "issues.html")
+    with open(page, "w") as f:
+        f.write(f"""<!doctype html><html><head><meta charset="utf-8"><title>Unclaimed issues</title><style>
+:root{{--bg:#fff;--fg:#1a1a1a;--line:#e5e5e5;--link:#0b57d0}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#151515;--fg:#e8e8e8;--line:#2c2c2c;--link:#8ab4f8}}}}
+body{{background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,system-ui,sans-serif;margin:16px}}
+table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;padding:7px;border-bottom:1px solid var(--line);vertical-align:top}}
+a{{color:var(--link);text-decoration:none}}</style></head><body>
+<h2>Unclaimed issues ({len(found)})</h2>
+<p>Open, no assignee, last {args.days} days. Before coding: reproduce it locally, then comment
+that you are taking it. Aim for 50-100 lines.</p>
+<table><tr><th>Repo</th><th>Issue</th><th>Labels</th><th>Comments</th><th>Opened</th></tr>{rows}</table></body></html>""")
+    for i in found[:args.show]:
+        print(f'{i["repo"]:<34} {i["url"]}\n    {i["title"][:90]}  [{", ".join(i["labels"])}]')
+    sources.log(f"\n{len(found)} unclaimed issues -> {page}")
+    if args.open:
+        import webbrowser
+        webbrowser.open(f"file://{page}")
 
 
 def main() -> None:
@@ -120,6 +171,12 @@ def main() -> None:
 
     sub.add_parser("funnel", help="show pipeline counts and reply rates")
 
+    i = sub.add_parser("issues", help="unclaimed issues in the startups' public repos")
+    i.add_argument("--repo", nargs="*", help="owner/name; default: repos found by the last scan --enrich")
+    i.add_argument("--days", type=int, default=60)
+    i.add_argument("--show", type=int, default=20, help="how many to print in the terminal")
+    i.add_argument("--open", action="store_true", help="open out/issues.html in the browser")
+
     args = ap.parse_args()
     cfg = load_config(args.config)
     pipe_path = os.path.join(ROOT, cfg.get("pipeline_file", "pipeline.csv"))
@@ -129,6 +186,8 @@ def main() -> None:
     elif args.cmd == "track":
         row = pipeline.track(pipe_path, args.company, args.stage, args.role, args.channel, args.note)
         print(f'{row["company"]}: {row["stage"]} ({row["updated"]})')
+    elif args.cmd == "issues":
+        issues(args, cfg)
     elif args.cmd == "funnel":
         print(pipeline.funnel(pipe_path))
 
